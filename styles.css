@@ -101,7 +101,7 @@
 
 .dtl-hour-row {
   position: relative;
-  height: 72px; /* PX_PER_MIN(1.2) × 60 */
+  height: var(--dtl-row-h, 72px);
   border-top: 1px solid var(--background-modifier-border);
 }
 
@@ -425,6 +425,126 @@
   padding: 1px 4px;
 }
 
+/* ── Top resize handle ────────────────────────────────────────── */
+.dtl-event-resize-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: ns-resize;
+  border-radius: 4px 4px 0 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 1;
+}
+
+.dtl-event:hover .dtl-event-resize-top {
+  opacity: 1;
+  background: var(--interactive-accent);
+}
+
+/* ── Drag tooltip ─────────────────────────────────────────────── */
+.dtl-drag-tooltip {
+  position: fixed;
+  z-index: 99999;
+  background: var(--background-modifier-active-hover);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  display: none;
+}
+
+/* ── Zoom controls ────────────────────────────────────────────── */
+.dtl-zoom-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.dtl-zoom-btn {
+  background: none;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dtl-zoom-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.dtl-zoom-label {
+  font-size: 10px;
+  color: var(--text-faint);
+  min-width: 28px;
+  text-align: center;
+  user-select: none;
+}
+
+/* ── Daily stats bar ─────────────────────────────────────────── */
+.dtl-stats {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-top: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  flex-wrap: wrap;
+}
+
+.dtl-stats-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.dtl-stats-count {
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+.dtl-stats-total {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.dtl-stats-tags {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.dtl-stats-chip {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--chip-color, var(--text-muted));
+  border: 1px solid var(--chip-color, var(--background-modifier-border));
+  border-radius: 10px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
 /* ── Hover ghost preview ──────────────────────────────────────── */
 .dtl-ghost {
   position: absolute;
@@ -542,4 +662,16 @@
 
 .dtl-popup-btn--danger:hover {
   background: rgba(var(--color-red-rgb, 220, 53, 69), 0.08);
+}
+
+.dtl-popup-btn--link {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+}
+
+.dtl-popup-btn--link:hover {
+  background: rgba(var(--interactive-accent-rgb, 100, 130, 230), 0.08);
+  color: var(--interactive-accent);
 }

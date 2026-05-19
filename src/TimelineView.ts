@@ -4,14 +4,16 @@ import {
   updateEventInContent,
   deleteEventFromContent,
   insertEventIntoContent,
+  colorForTag,
   ScheduleEvent,
   pad,
 } from './parser';
 import type TimelinePlugin from './main';
 
 export const TIMELINE_VIEW_TYPE = 'schedule-calendar';
-const PX_PER_MIN = 1.2;
+const BASE_PX_PER_MIN = 1.2;
 const SNAP_MIN = 15;
+const ZOOM_LEVELS = [0.75, 1, 1.5, 2];
 
 type ViewMode = 'daily' | 'weekly' | 'monthly';
 
@@ -23,6 +25,11 @@ export class TimelineView extends ItemView {
   private nowLineEls: HTMLElement[] = [];
   private nowInterval: number | null = null;
   private activePopup: HTMLElement | null = null;
+  private zoomLevel = 1;
+  private undoStack: Array<{ file: TFile; content: string }> = [];
+  private dragTooltipEl: HTMLElement | null = null;
+
+  private get pxPerMin() { return BASE_PX_PER_MIN * this.zoomLevel; }
 
   constructor(leaf: WorkspaceLeaf, private plugin: TimelinePlugin) {
     super(leaf);
@@ -39,17 +46,27 @@ export class TimelineView extends ItemView {
         if (this.mode === 'daily' && file === this.currentFile) this.refreshDailyEvents();
       })
     );
+    this.registerDomEvent(document, 'keydown', (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'z') {
+        if (this.app.workspace.getActiveViewOfType(TimelineView) === this) {
+          e.preventDefault();
+          this.undo();
+        }
+      }
+    });
   }
 
   async onClose() {
     if (this.nowInterval !== null) window.clearInterval(this.nowInterval);
     this.closePopup();
+    this.hideDragTooltip(true);
   }
 
   private async render() {
     const root = this.containerEl.children[1] as HTMLElement;
     root.empty();
     root.addClass('dtl-root');
+    root.style.setProperty('--dtl-row-h', `${this.pxPerMin * 60}px`);
     this.eventsEl = null;
     this.nowLineEls = [];
     if (this.nowInterval !== null) { window.clearInterval(this.nowInterval); this.nowInterval = null; }
@@ -70,11 +87,27 @@ export class TimelineView extends ItemView {
     const nav = header.createEl('div', { cls: 'dtl-nav' });
     nav.createEl('button', { cls: 'dtl-nav-btn', text: '‹' })
       .addEventListener('click', () => { this.shiftDate(-1); this.render(); });
-    const dateEl = nav.createEl('span', { cls: 'dtl-date', text: this.getDateLabel() });
+    nav.createEl('span', { cls: 'dtl-date', text: this.getDateLabel() });
     nav.createEl('button', { cls: 'dtl-nav-btn', text: '›' })
       .addEventListener('click', () => { this.shiftDate(1); this.render(); });
     nav.createEl('button', { cls: 'dtl-today-btn', text: '오늘' })
       .addEventListener('click', () => { this.focusDate = moment(); this.render(); });
+
+    if (this.mode !== 'monthly') {
+      const zoomCtrl = header.createEl('div', { cls: 'dtl-zoom-ctrl' });
+      const minusBtn = zoomCtrl.createEl('button', { cls: 'dtl-zoom-btn', text: '−' });
+      zoomCtrl.createEl('span', { cls: 'dtl-zoom-label', text: `${this.zoomLevel}×` });
+      const plusBtn = zoomCtrl.createEl('button', { cls: 'dtl-zoom-btn', text: '+' });
+
+      minusBtn.addEventListener('click', () => {
+        const idx = ZOOM_LEVELS.indexOf(this.zoomLevel);
+        if (idx > 0) { this.zoomLevel = ZOOM_LEVELS[idx - 1]; this.render(); }
+      });
+      plusBtn.addEventListener('click', () => {
+        const idx = ZOOM_LEVELS.indexOf(this.zoomLevel);
+        if (idx < ZOOM_LEVELS.length - 1) { this.zoomLevel = ZOOM_LEVELS[idx + 1]; this.render(); }
+      });
+    }
 
     const toggle = header.createEl('div', { cls: 'dtl-mode-toggle' });
     for (const [m, label] of [['daily', '일'], ['weekly', '주'], ['monthly', '월']] as [ViewMode, string][]) {
@@ -123,12 +156,11 @@ export class TimelineView extends ItemView {
 
     this.setupHoverPreview(grid);
 
-    // Double-click empty area → add event
     grid.addEventListener('dblclick', (e: MouseEvent) => {
       if ((e.target as HTMLElement).closest('.dtl-event')) return;
       const dur = this.plugin.settings.defaultDuration;
       const y = e.clientY - grid.getBoundingClientRect().top;
-      const startMin = Math.max(0, Math.min(1440 - dur, Math.round(y / PX_PER_MIN / dur) * dur));
+      const startMin = Math.max(0, Math.min(1440 - dur, Math.round(y / this.pxPerMin / dur) * dur));
       this.openAddPopup(e.clientX, e.clientY, startMin, startMin + dur, file);
     });
 
@@ -139,8 +171,10 @@ export class TimelineView extends ItemView {
 
     requestAnimationFrame(() => {
       const now = moment();
-      wrap.scrollTop = Math.max(0, (now.hours() * 60 + now.minutes() - 60) * PX_PER_MIN);
+      wrap.scrollTop = Math.max(0, (now.hours() * 60 + now.minutes() - 60) * this.pxPerMin);
     });
+
+    if (events.length > 0) this.renderDailyStats(root, events);
   }
 
   private renderDailyEvents(container: HTMLElement, events: ScheduleEvent[], file: TFile) {
@@ -168,7 +202,6 @@ export class TimelineView extends ItemView {
     const wrap = root.createEl('div', { cls: 'dtl-wrap dtl-wrap--weekly' });
     const weekGrid = wrap.createEl('div', { cls: 'dtl-week-grid' });
 
-    // Day headers
     const headerRow = weekGrid.createEl('div', { cls: 'dtl-week-headers' });
     headerRow.createEl('div', { cls: 'dtl-week-gutter' });
     for (const day of days) {
@@ -181,14 +214,12 @@ export class TimelineView extends ItemView {
 
     const colsWrap = weekGrid.createEl('div', { cls: 'dtl-week-cols-wrap' });
 
-    // Hour labels column
     const hourCol = colsWrap.createEl('div', { cls: 'dtl-week-hour-col' });
     for (let h = 0; h < 24; h++) {
       hourCol.createEl('div', { cls: 'dtl-hour-row' })
         .createEl('span', { cls: 'dtl-hour-label', text: h === 0 ? '' : `${pad(h)}:00` });
     }
 
-    // Load all day data in parallel
     const dayData = await Promise.all(days.map(async (day) => {
       const fp = normalizePath(`${this.plugin.settings.dailyNotePath}${day.format('YYYY-MM-DD')}.md`);
       const f = this.app.vault.getAbstractFileByPath(fp);
@@ -216,7 +247,7 @@ export class TimelineView extends ItemView {
           if ((e.target as HTMLElement).closest('.dtl-event')) return;
           const dur = this.plugin.settings.defaultDuration;
           const y = e.clientY - col.getBoundingClientRect().top;
-          const startMin = Math.max(0, Math.min(1440 - dur, Math.round(y / PX_PER_MIN / dur) * dur));
+          const startMin = Math.max(0, Math.min(1440 - dur, Math.round(y / this.pxPerMin / dur) * dur));
           this.openAddPopup(e.clientX, e.clientY, startMin, startMin + dur, file);
         });
       }
@@ -232,7 +263,7 @@ export class TimelineView extends ItemView {
 
     requestAnimationFrame(() => {
       const now = moment();
-      colsWrap.scrollTop = Math.max(0, (now.hours() * 60 + now.minutes() - 60) * PX_PER_MIN);
+      colsWrap.scrollTop = Math.max(0, (now.hours() * 60 + now.minutes() - 60) * this.pxPerMin);
     });
   }
 
@@ -251,7 +282,6 @@ export class TimelineView extends ItemView {
 
     const grid = wrap.createEl('div', { cls: 'dtl-month-grid' });
 
-    // Load events in parallel
     const dates: moment.Moment[] = [];
     let cur = gridStart.clone();
     while (cur.isSameOrBefore(gridEnd, 'day')) { dates.push(cur.clone()); cur.add(1, 'day'); }
@@ -277,8 +307,10 @@ export class TimelineView extends ItemView {
 
       const events = eventMap.get(dateStr) ?? [];
       const chips = cell.createEl('div', { cls: 'dtl-month-chips' });
-      for (const ev of events.slice(0, 3))
-        chips.createEl('div', { cls: 'dtl-month-chip', text: ev.title });
+      for (const ev of events.slice(0, 3)) {
+        const chip = chips.createEl('div', { cls: 'dtl-month-chip', text: ev.title });
+        if (ev.tag) chip.style.borderLeftColor = colorForTag(ev.tag);
+      }
       if (events.length > 3)
         chips.createEl('div', { cls: 'dtl-month-more', text: `+${events.length - 3}` });
 
@@ -320,6 +352,17 @@ export class TimelineView extends ItemView {
     btnRow.createEl('button', { cls: 'dtl-popup-btn', text: 'Cancel' })
       .addEventListener('click', () => this.closePopup());
 
+    // Show open-note button when title contains [[wiki link]]
+    const wikiMatch = event.title.match(/\[\[([^\]|]+)/);
+    if (wikiMatch) {
+      const openBtn = btnRow.createEl('button', { cls: 'dtl-popup-btn dtl-popup-btn--link', text: '↗' });
+      openBtn.setAttribute('aria-label', `Open ${wikiMatch[1]}`);
+      openBtn.addEventListener('click', () => {
+        this.app.workspace.openLinkText(wikiMatch[1], file.path, false);
+        this.closePopup();
+      });
+    }
+
     const doSave = async () => {
       const title = titleInput.value.trim();
       if (!title) return;
@@ -330,6 +373,7 @@ export class TimelineView extends ItemView {
         startHour: sh, startMin: sm, endHour: eh, endMin: em,
         startMinutes: sh * 60 + sm, endMinutes: eh * 60 + em,
       };
+      await this.pushUndo(file);
       const content = await this.app.vault.read(file);
       await this.app.vault.modify(file, updateEventInContent(content, event.raw, updated));
       this.closePopup();
@@ -337,6 +381,7 @@ export class TimelineView extends ItemView {
     };
 
     const doDelete = async () => {
+      await this.pushUndo(file);
       const content = await this.app.vault.read(file);
       await this.app.vault.modify(file, deleteEventFromContent(content, event.raw));
       this.closePopup();
@@ -388,6 +433,7 @@ export class TimelineView extends ItemView {
         startHour: sh, startMin: sm, endHour: eh, endMin: em,
         startMinutes: sh * 60 + sm, endMinutes: eh * 60 + em, raw: '',
       };
+      await this.pushUndo(file);
       const content = await this.app.vault.read(file);
       await this.app.vault.modify(file, insertEventIntoContent(content, newEvent, this.plugin.settings.scheduleSection));
       this.closePopup();
@@ -407,10 +453,8 @@ export class TimelineView extends ItemView {
     const popup = document.body.createEl('div', { cls: 'dtl-popup' });
     this.activePopup = popup;
 
-    // Prevent clicks inside popup from triggering the outside-click handler
     popup.addEventListener('mousedown', (e) => e.stopPropagation());
 
-    // Position after render so we know popup dimensions
     requestAnimationFrame(() => {
       const w = popup.offsetWidth || 280, h = popup.offsetHeight || 180;
       let left = clientX + 8, top = clientY + 8;
@@ -420,7 +464,6 @@ export class TimelineView extends ItemView {
       popup.style.top = `${Math.max(8, top)}px`;
     });
 
-    // Close on outside click (after current event propagation finishes)
     const outsideHandler = (e: MouseEvent) => {
       if (!popup.contains(e.target as Node)) {
         this.closePopup();
@@ -440,6 +483,33 @@ export class TimelineView extends ItemView {
     ];
   }
 
+  // ─── Stats ─────────────────────────────────────────────────────────────────
+
+  private renderDailyStats(root: HTMLElement, events: ScheduleEvent[]) {
+    const statsEl = root.createEl('div', { cls: 'dtl-stats' });
+    const totalMin = events.reduce((sum, ev) => sum + ev.endMinutes - ev.startMinutes, 0);
+    const h = Math.floor(totalMin / 60), m = totalMin % 60;
+
+    const infoEl = statsEl.createEl('div', { cls: 'dtl-stats-info' });
+    infoEl.createEl('span', { cls: 'dtl-stats-count', text: `${events.length}개` });
+    infoEl.createEl('span', { cls: 'dtl-stats-total', text: `총 ${h}h${m > 0 ? ` ${m}m` : ''}` });
+
+    const tagMap = new Map<string, number>();
+    for (const ev of events) {
+      if (ev.tag) tagMap.set(ev.tag, (tagMap.get(ev.tag) || 0) + (ev.endMinutes - ev.startMinutes));
+    }
+
+    if (tagMap.size > 0) {
+      const tagsEl = statsEl.createEl('div', { cls: 'dtl-stats-tags' });
+      for (const [tag, min] of tagMap) {
+        const chip = tagsEl.createEl('span', { cls: 'dtl-stats-chip' });
+        chip.style.setProperty('--chip-color', colorForTag(tag));
+        const th = Math.floor(min / 60), tm = min % 60;
+        chip.textContent = `#${tag} ${th}h${tm > 0 ? ` ${tm}m` : ''}`;
+      }
+    }
+  }
+
   // ─── Shared helpers ─────────────────────────────────────────────────────────
 
   private createGrid(parent: HTMLElement): HTMLElement {
@@ -452,12 +522,16 @@ export class TimelineView extends ItemView {
   }
 
   private createEventEl(container: HTMLElement, event: ScheduleEvent, compact: boolean): HTMLElement {
-    const top = event.startMinutes * PX_PER_MIN;
-    const height = Math.max((event.endMinutes - event.startMinutes) * PX_PER_MIN, 24);
+    const top = event.startMinutes * this.pxPerMin;
+    const height = Math.max((event.endMinutes - event.startMinutes) * this.pxPerMin, 24);
 
     const el = container.createEl('div', { cls: 'dtl-event' + (compact ? ' dtl-event--compact' : '') });
     el.style.top = `${top}px`;
     el.style.height = `${height}px`;
+
+    if (event.tag) el.style.borderLeftColor = colorForTag(event.tag);
+
+    if (!compact) el.createEl('div', { cls: 'dtl-event-resize-top' });
 
     if (!compact) {
       el.createEl('div', {
@@ -465,7 +539,6 @@ export class TimelineView extends ItemView {
         text: `${pad(event.startHour)}:${pad(event.startMin)} – ${pad(event.endHour)}:${pad(event.endMin)}`,
       });
     } else if (height >= 36) {
-      // Show start time in compact mode when there's enough height
       el.createEl('div', {
         cls: 'dtl-event-time',
         text: `${pad(event.startHour)}:${pad(event.startMin)}`,
@@ -483,26 +556,69 @@ export class TimelineView extends ItemView {
     el.addEventListener('pointermove', () => { didMove = true; });
     el.addEventListener('click', (e: MouseEvent) => {
       if (didMove) return;
-      if ((e.target as HTMLElement).closest('.dtl-event-resize')) return;
+      if ((e.target as HTMLElement).closest('.dtl-event-resize, .dtl-event-resize-top')) return;
       e.stopPropagation();
       this.openEditPopup(e.clientX, e.clientY, event, file);
     });
+  }
+
+  // ─── Undo ────────────────────────────────────────────────────────────────────
+
+  private async pushUndo(file: TFile) {
+    const content = await this.app.vault.read(file);
+    this.undoStack.push({ file, content });
+    if (this.undoStack.length > 20) this.undoStack.shift();
+  }
+
+  private async undo() {
+    const last = this.undoStack.pop();
+    if (!last) return;
+    await this.app.vault.modify(last.file, last.content);
+    if (this.mode !== 'daily') await this.render();
+  }
+
+  // ─── Drag tooltip ────────────────────────────────────────────────────────────
+
+  private showDragTooltip(clientX: number, clientY: number, text: string) {
+    if (!this.dragTooltipEl) {
+      this.dragTooltipEl = document.body.createEl('div', { cls: 'dtl-drag-tooltip' });
+    }
+    this.dragTooltipEl.textContent = text;
+    this.dragTooltipEl.style.display = 'block';
+    this.dragTooltipEl.style.left = `${clientX + 14}px`;
+    this.dragTooltipEl.style.top = `${clientY - 28}px`;
+  }
+
+  private hideDragTooltip(remove = false) {
+    if (!this.dragTooltipEl) return;
+    if (remove) {
+      this.dragTooltipEl.remove();
+      this.dragTooltipEl = null;
+    } else {
+      this.dragTooltipEl.style.display = 'none';
+    }
   }
 
   // ─── Daily drag ─────────────────────────────────────────────────────────────
 
   private attachDailyDrag(el: HTMLElement, event: ScheduleEvent, file: TFile) {
     const resizeHandle = el.querySelector('.dtl-event-resize') as HTMLElement;
+    const resizeTopHandle = el.querySelector('.dtl-event-resize-top') as HTMLElement | null;
     const duration = event.endMinutes - event.startMinutes;
     let startY = 0, startMin = 0, moved = false;
 
+    const fmt = (s: number, e: number) =>
+      `${pad(Math.floor(s / 60))}:${pad(s % 60)} – ${pad(Math.floor(e / 60))}:${pad(e % 60)}`;
+
+    // ── Move drag ──
     const onMoveMove = (e: PointerEvent) => {
       moved = true;
-      const snapped = Math.round((e.clientY - startY) / PX_PER_MIN / SNAP_MIN) * SNAP_MIN;
+      const snapped = Math.round((e.clientY - startY) / this.pxPerMin / SNAP_MIN) * SNAP_MIN;
       const newStart = Math.max(0, Math.min(1440 - duration, startMin + snapped));
-      el.style.top = `${newStart * PX_PER_MIN}px`;
+      el.style.top = `${newStart * this.pxPerMin}px`;
       const t = el.querySelector('.dtl-event-time');
-      if (t) t.textContent = `${pad(Math.floor(newStart / 60))}:${pad(newStart % 60)} – ${pad(Math.floor((newStart + duration) / 60))}:${pad((newStart + duration) % 60)}`;
+      if (t) t.textContent = fmt(newStart, newStart + duration);
+      this.showDragTooltip(e.clientX, e.clientY, fmt(newStart, newStart + duration));
     };
 
     const onMoveUp = async (e: PointerEvent) => {
@@ -510,14 +626,15 @@ export class TimelineView extends ItemView {
       el.releasePointerCapture(e.pointerId);
       document.removeEventListener('pointermove', onMoveMove);
       document.removeEventListener('pointerup', onMoveUp);
+      this.hideDragTooltip();
       if (!moved) return;
-      const snapped = Math.round((e.clientY - startY) / PX_PER_MIN / SNAP_MIN) * SNAP_MIN;
+      const snapped = Math.round((e.clientY - startY) / this.pxPerMin / SNAP_MIN) * SNAP_MIN;
       const newStart = Math.max(0, Math.min(1440 - duration, startMin + snapped));
       if (newStart !== startMin) await this.saveEvent(file, event, newStart, newStart + duration);
     };
 
     el.addEventListener('pointerdown', (e: PointerEvent) => {
-      if ((e.target as HTMLElement).closest('.dtl-event-resize')) return;
+      if ((e.target as HTMLElement).closest('.dtl-event-resize, .dtl-event-resize-top')) return;
       e.preventDefault();
       moved = false;
       el.classList.add('dtl-dragging');
@@ -528,21 +645,24 @@ export class TimelineView extends ItemView {
       document.addEventListener('pointerup', onMoveUp);
     });
 
+    // ── Bottom resize (end time) ──
     let resizeStartY = 0, resizeStartEnd = 0;
 
     const onResizeMove = (e: PointerEvent) => {
-      const snapped = Math.round((e.clientY - resizeStartY) / PX_PER_MIN / SNAP_MIN) * SNAP_MIN;
+      const snapped = Math.round((e.clientY - resizeStartY) / this.pxPerMin / SNAP_MIN) * SNAP_MIN;
       const newEnd = Math.max(event.startMinutes + SNAP_MIN, Math.min(1440, resizeStartEnd + snapped));
-      el.style.height = `${Math.max(24, (newEnd - event.startMinutes) * PX_PER_MIN)}px`;
+      el.style.height = `${Math.max(24, (newEnd - event.startMinutes) * this.pxPerMin)}px`;
       const t = el.querySelector('.dtl-event-time');
-      if (t) t.textContent = `${pad(event.startHour)}:${pad(event.startMin)} – ${pad(Math.floor(newEnd / 60))}:${pad(newEnd % 60)}`;
+      if (t) t.textContent = fmt(event.startMinutes, newEnd);
+      this.showDragTooltip(e.clientX, e.clientY, fmt(event.startMinutes, newEnd));
     };
 
     const onResizeUp = async (e: PointerEvent) => {
       resizeHandle.releasePointerCapture(e.pointerId);
       document.removeEventListener('pointermove', onResizeMove);
       document.removeEventListener('pointerup', onResizeUp);
-      const snapped = Math.round((e.clientY - resizeStartY) / PX_PER_MIN / SNAP_MIN) * SNAP_MIN;
+      this.hideDragTooltip();
+      const snapped = Math.round((e.clientY - resizeStartY) / this.pxPerMin / SNAP_MIN) * SNAP_MIN;
       const newEnd = Math.max(event.startMinutes + SNAP_MIN, Math.min(1440, resizeStartEnd + snapped));
       if (newEnd !== resizeStartEnd) await this.saveEvent(file, event, event.startMinutes, newEnd);
     };
@@ -555,6 +675,40 @@ export class TimelineView extends ItemView {
       document.addEventListener('pointermove', onResizeMove);
       document.addEventListener('pointerup', onResizeUp);
     });
+
+    // ── Top resize (start time) ──
+    if (resizeTopHandle) {
+      let topStartY = 0, topOrigStart = 0;
+
+      const onTopResizeMove = (e: PointerEvent) => {
+        const snapped = Math.round((e.clientY - topStartY) / this.pxPerMin / SNAP_MIN) * SNAP_MIN;
+        const newStart = Math.max(0, Math.min(event.endMinutes - SNAP_MIN, topOrigStart + snapped));
+        el.style.top = `${newStart * this.pxPerMin}px`;
+        el.style.height = `${Math.max(24, (event.endMinutes - newStart) * this.pxPerMin)}px`;
+        const t = el.querySelector('.dtl-event-time');
+        if (t) t.textContent = fmt(newStart, event.endMinutes);
+        this.showDragTooltip(e.clientX, e.clientY, fmt(newStart, event.endMinutes));
+      };
+
+      const onTopResizeUp = async (e: PointerEvent) => {
+        resizeTopHandle.releasePointerCapture(e.pointerId);
+        document.removeEventListener('pointermove', onTopResizeMove);
+        document.removeEventListener('pointerup', onTopResizeUp);
+        this.hideDragTooltip();
+        const snapped = Math.round((e.clientY - topStartY) / this.pxPerMin / SNAP_MIN) * SNAP_MIN;
+        const newStart = Math.max(0, Math.min(event.endMinutes - SNAP_MIN, topOrigStart + snapped));
+        if (newStart !== topOrigStart) await this.saveEvent(file, event, newStart, event.endMinutes);
+      };
+
+      resizeTopHandle.addEventListener('pointerdown', (e: PointerEvent) => {
+        e.preventDefault(); e.stopPropagation();
+        resizeTopHandle.setPointerCapture(e.pointerId);
+        topStartY = e.clientY;
+        topOrigStart = event.startMinutes;
+        document.addEventListener('pointermove', onTopResizeMove);
+        document.addEventListener('pointerup', onTopResizeUp);
+      });
+    }
   }
 
   // ─── Weekly drag (vertical time change only) ─────────────────────────────────
@@ -573,12 +727,15 @@ export class TimelineView extends ItemView {
       const calcStart = (clientY: number) => {
         const rawTopPx = clientY - col.getBoundingClientRect().top - grabOffsetPx;
         return Math.max(0, Math.min(1440 - duration,
-          Math.round(Math.max(0, rawTopPx) / PX_PER_MIN / SNAP_MIN) * SNAP_MIN));
+          Math.round(Math.max(0, rawTopPx) / this.pxPerMin / SNAP_MIN) * SNAP_MIN));
       };
 
       const onMove = (e: PointerEvent) => {
         moved = true;
-        el.style.top = `${calcStart(e.clientY) * PX_PER_MIN}px`;
+        const newStart = calcStart(e.clientY);
+        el.style.top = `${newStart * this.pxPerMin}px`;
+        this.showDragTooltip(e.clientX, e.clientY,
+          `${pad(Math.floor(newStart / 60))}:${pad(newStart % 60)} – ${pad(Math.floor((newStart + duration) / 60))}:${pad((newStart + duration) % 60)}`);
       };
 
       const onUp = async (e: PointerEvent) => {
@@ -586,6 +743,7 @@ export class TimelineView extends ItemView {
         el.releasePointerCapture(e.pointerId);
         document.removeEventListener('pointermove', onMove);
         document.removeEventListener('pointerup', onUp);
+        this.hideDragTooltip();
         if (!moved) return;
         const newStart = calcStart(e.clientY);
         if (newStart !== event.startMinutes) {
@@ -611,11 +769,11 @@ export class TimelineView extends ItemView {
       }
       const dur = this.plugin.settings.defaultDuration;
       const y = e.clientY - grid.getBoundingClientRect().top;
-      const startMin = Math.max(0, Math.min(1440 - dur, Math.round(y / PX_PER_MIN / dur) * dur));
+      const startMin = Math.max(0, Math.min(1440 - dur, Math.round(y / this.pxPerMin / dur) * dur));
       const endMin = startMin + dur;
       ghost.style.display = 'block';
-      ghost.style.top = `${startMin * PX_PER_MIN}px`;
-      ghost.style.height = `${dur * PX_PER_MIN}px`;
+      ghost.style.top = `${startMin * this.pxPerMin}px`;
+      ghost.style.height = `${dur * this.pxPerMin}px`;
       ghost.textContent = `${pad(Math.floor(startMin / 60))}:${pad(startMin % 60)} – ${pad(Math.floor(endMin / 60))}:${pad(endMin % 60)}`;
     });
 
@@ -625,6 +783,7 @@ export class TimelineView extends ItemView {
   // ─── Data ───────────────────────────────────────────────────────────────────
 
   private async saveEvent(file: TFile, event: ScheduleEvent, newStartMin: number, newEndMin: number) {
+    await this.pushUndo(file);
     const updated: ScheduleEvent = {
       ...event,
       startMinutes: newStartMin, endMinutes: newEndMin,
@@ -637,7 +796,7 @@ export class TimelineView extends ItemView {
 
   private tickNowLines() {
     const now = moment();
-    const top = (now.hours() * 60 + now.minutes()) * PX_PER_MIN;
+    const top = (now.hours() * 60 + now.minutes()) * this.pxPerMin;
     for (const el of this.nowLineEls) el.style.top = `${top}px`;
   }
 }

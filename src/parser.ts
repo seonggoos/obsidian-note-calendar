@@ -1,6 +1,7 @@
 export interface ScheduleEvent {
   id: string;
   title: string;
+  tag?: string;
   startHour: number;
   startMin: number;
   endHour: number;
@@ -11,6 +12,14 @@ export interface ScheduleEvent {
 }
 
 const SCHEDULE_REGEX = /^- (\d{2}):(\d{2})\s*[-–]\s*(\d{2}):(\d{2})\s+(.+)$/;
+
+const TAG_PALETTE = ['#4A90E2', '#27AE60', '#F39C12', '#8E44AD', '#E74C3C', '#16A085', '#D35400', '#2980B9'];
+
+export function colorForTag(tag: string): string {
+  let h = 0;
+  for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
+  return TAG_PALETTE[h % TAG_PALETTE.length];
+}
 
 export function parseSchedules(content: string, sectionName = 'Schedules'): ScheduleEvent[] {
   const events: ScheduleEvent[] = [];
@@ -28,10 +37,13 @@ export function parseSchedules(content: string, sectionName = 'Schedules'): Sche
     const [, sh, sm, eh, em, title] = match;
     const startH = parseInt(sh), startM = parseInt(sm);
     const endH = parseInt(eh), endM = parseInt(em);
+    const trimTitle = title.trim();
+    const tagMatch = trimTitle.match(/#([A-Za-z]\w*)/);
 
     events.push({
-      id: `${sh}${sm}${eh}${em}${title}`,
-      title: title.trim(),
+      id: `${sh}${sm}${eh}${em}${trimTitle}`,
+      title: trimTitle,
+      tag: tagMatch ? tagMatch[1].toLowerCase() : undefined,
       startHour: startH, startMin: startM,
       endHour: endH, endMin: endM,
       startMinutes: startH * 60 + startM,
@@ -64,11 +76,9 @@ export function insertEventIntoContent(
   const sectionIdx = lines.findIndex(l => l.trim() === `### ${sectionName}`);
 
   if (sectionIdx === -1) {
-    // Section doesn't exist — append it
     return content + `\n### ${sectionName}\n${newLine}\n`;
   }
 
-  // Collect indices of existing schedule lines in this section
   const scheduleLines: { idx: number; startMinutes: number }[] = [];
   for (let i = sectionIdx + 1; i < lines.length; i++) {
     if (lines[i].startsWith('###')) break;
@@ -79,7 +89,6 @@ export function insertEventIntoContent(
     }
   }
 
-  // Find insertion position (sorted by startMinutes)
   let insertIdx = sectionIdx + 1;
   for (const sl of scheduleLines) {
     if (sl.startMinutes <= event.startMinutes) {
@@ -100,4 +109,3 @@ export function formatEventLine(event: ScheduleEvent): string {
 export function pad(n: number): string {
   return String(n).padStart(2, '0');
 }
-
