@@ -11,11 +11,34 @@ A visual interactive calendar for [Obsidian](https://obsidian.md) — turn your 
 
 ### Interactions
 - **Drag to move** — drag events up/down to reschedule (snaps to 15-minute intervals)
-- **Resize** — drag the bottom edge of an event to change its end time
+- **Resize** — drag the bottom or top edge of an event to adjust end or start time
 - **Click to edit** — click any event to open a popup and edit title or time
 - **Delete** — remove an event directly from the edit popup
 - **Double-click to add** — double-click any empty time slot to create a new event; a ghost preview shows the time range before you confirm
+- **Undo** — press `Cmd/Ctrl+Z` to revert the last change (up to 20 steps)
 - **Auto-sync** — all changes are instantly written back to your note file
+
+### Drag tooltip
+A floating `HH:MM – HH:MM` label follows your cursor during any drag or resize so you always know exactly where an event will land.
+
+### Tag colors
+Add a `#tag` anywhere in an event title to apply a unique accent color. The same color appears on monthly chips and in the daily stats bar.
+
+```markdown
+- 09:00 - 10:00 Morning standup #work
+- 10:00 - 12:00 Deep work session #work
+- 13:00 - 14:00 Lunch #life
+- 18:00 - 19:00 Gym #health
+```
+
+### Daily stats bar
+The bottom of the daily view shows the total scheduled time and a per-tag breakdown.
+
+### Zoom
+Use the `−` / `+` buttons in the header to scale the timeline density (0.75× / 1× / 1.5× / 2×).
+
+### Note links
+If an event title contains a `[[wiki link]]`, the edit popup shows an `↗` button to open that note directly.
 
 ### Other
 - **Now line** — red indicator showing the current time
@@ -38,12 +61,12 @@ Your daily note must contain a `### Schedule` section with entries in this forma
 ```markdown
 ### Schedule
 - 09:00 - 10:00 Morning routine
-- 10:00 - 13:00 Deep work
-- 13:00 - 14:00 Lunch
-- 14:00 - 18:00 Meetings
+- 10:00 - 13:00 Deep work #work
+- 13:00 - 14:00 Lunch #life
+- 14:00 - 18:00 Meetings #work
 ```
 
-The section name (`Schedule`) is configurable in settings.
+The section name (`Schedule`) is configurable in settings. Adding `#tag` is optional — events without a tag use the default accent color.
 
 ## Installation
 
@@ -73,6 +96,7 @@ The section name (`Schedule`) is configurable in settings.
 - Use the **일 / 주 / 월** (Day / Week / Month) toggle in the header to switch views
 - Use **‹ ›** arrows to navigate, and **오늘** (Today) to jump back to today
 - In weekly/monthly view, click a day to open it in daily view
+- Press **`Cmd/Ctrl+Z`** to undo the last change
 
 ## Settings
 
