@@ -1,0 +1,545 @@
+/* ── Root ─────────────────────────────────────────────────────── */
+.dtl-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-interface);
+  font-size: var(--font-ui-small);
+  background: var(--background-primary);
+}
+
+/* ── Header ───────────────────────────────────────────────────── */
+.dtl-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.dtl-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.dtl-date {
+  flex: 1;
+  text-align: center;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dtl-nav-btn,
+.dtl-today-btn {
+  background: none;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+
+.dtl-nav-btn:hover,
+.dtl-today-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.dtl-mode-toggle {
+  display: flex;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 5px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.dtl-mode-btn {
+  background: none;
+  border: none;
+  padding: 2px 9px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.dtl-mode-btn.active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.dtl-mode-btn:hover:not(.active) {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* ── Daily wrap ───────────────────────────────────────────────── */
+.dtl-wrap {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px 12px 48px 12px;
+}
+
+/* ── Time grid ────────────────────────────────────────────────── */
+.dtl-grid {
+  position: relative;
+  margin-left: 40px;
+}
+
+.dtl-hour-row {
+  position: relative;
+  height: 72px; /* PX_PER_MIN(1.2) × 60 */
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.dtl-hour-label {
+  position: absolute;
+  left: -38px;
+  top: -8px;
+  font-size: 10px;
+  color: var(--text-faint);
+  width: 32px;
+  text-align: right;
+  user-select: none;
+}
+
+/* ── Events overlay ───────────────────────────────────────────── */
+.dtl-events {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.dtl-event {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  background: var(--background-secondary);
+  border-left: 3px solid var(--interactive-accent);
+  border-radius: 4px;
+  padding: 3px 6px 10px 7px;
+  font-size: 11px;
+  cursor: grab;
+  user-select: none;
+  pointer-events: all;
+  box-sizing: border-box;
+  overflow: hidden;
+  transition: box-shadow 0.1s;
+}
+
+.dtl-event:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  z-index: 10;
+}
+
+.dtl-event.dtl-dragging {
+  opacity: 0.85;
+  cursor: grabbing;
+  z-index: 100;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.dtl-event--compact {
+  padding: 3px 5px 4px 7px;
+  cursor: pointer;
+}
+
+.dtl-event-time {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-bottom: 1px;
+}
+
+.dtl-event-title {
+  font-weight: 500;
+  color: var(--text-normal);
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.dtl-event-resize {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: ns-resize;
+  border-radius: 0 0 4px 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.dtl-event:hover .dtl-event-resize {
+  opacity: 1;
+  background: var(--interactive-accent);
+}
+
+/* ── Now line ─────────────────────────────────────────────────── */
+.dtl-now-line {
+  position: absolute;
+  left: -2px;
+  right: 0;
+  height: 2px;
+  background: var(--color-red);
+  pointer-events: none;
+  z-index: 50;
+}
+
+.dtl-now-line::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-red);
+}
+
+/* ── Empty ────────────────────────────────────────────────────── */
+.dtl-empty {
+  padding: 32px 16px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+  white-space: pre-line;
+}
+
+/* ── Weekly layout ────────────────────────────────────────────── */
+.dtl-wrap--weekly {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+}
+
+.dtl-week-grid {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.dtl-week-headers {
+  display: flex;
+  border-bottom: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.dtl-week-gutter {
+  width: 40px;
+  flex-shrink: 0;
+}
+
+.dtl-week-day-header {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  padding: 5px 2px;
+  border-left: 1px solid var(--background-modifier-border);
+  cursor: pointer;
+}
+
+.dtl-week-day-header:hover {
+  background: var(--background-modifier-hover);
+}
+
+.dtl-week-day-header.today {
+  background: var(--background-modifier-active-hover);
+}
+
+.dtl-week-day-name {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.dtl-week-day-date {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.dtl-week-day-header.today .dtl-week-day-date {
+  color: var(--interactive-accent);
+}
+
+.dtl-week-cols-wrap {
+  display: flex;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 40px;
+  min-width: 0;
+}
+
+.dtl-week-hour-col {
+  width: 40px;
+  flex-shrink: 0;
+}
+
+.dtl-week-hour-col .dtl-hour-row {
+  border-right: 1px solid var(--background-modifier-border);
+}
+
+.dtl-week-col {
+  flex: 1;
+  min-width: 0;
+  border-left: 1px solid var(--background-modifier-border);
+  position: relative;
+}
+
+.dtl-week-col.today {
+  background: rgba(var(--interactive-accent-rgb, 100, 130, 230), 0.04);
+}
+
+.dtl-week-col .dtl-events {
+  pointer-events: all;
+}
+
+.dtl-week-col .dtl-now-line {
+  left: 0;
+}
+
+
+/* ── Monthly layout ───────────────────────────────────────────── */
+.dtl-month-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0 4px 4px;
+  min-width: 0;
+}
+
+.dtl-month-day-names {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-bottom: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
+}
+
+.dtl-month-day-name {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 5px 0 4px;
+  user-select: none;
+}
+
+.dtl-month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  align-content: start;
+  min-width: 0;
+}
+
+.dtl-month-cell {
+  border-right: 1px solid var(--background-modifier-border);
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding: 4px 4px 4px;
+  min-height: 72px;
+  cursor: pointer;
+  transition: background 0.1s;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.dtl-month-cell:nth-child(7n) {
+  border-right: none;
+}
+
+.dtl-month-cell:hover {
+  background: var(--background-modifier-hover);
+}
+
+.dtl-month-cell--out {
+  opacity: 0.3;
+}
+
+.dtl-month-cell--today .dtl-month-cell-day {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dtl-month-cell-day {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-normal);
+  margin-bottom: 3px;
+  line-height: 1;
+}
+
+.dtl-month-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.dtl-month-chip {
+  background: var(--background-modifier-active-hover);
+  border-left: 2px solid var(--interactive-accent);
+  border-radius: 2px;
+  padding: 1px 4px;
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  line-height: 1.5;
+}
+
+.dtl-month-more {
+  font-size: 9px;
+  color: var(--text-faint);
+  padding: 1px 4px;
+}
+
+/* ── Hover ghost preview ──────────────────────────────────────── */
+.dtl-ghost {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  background: rgba(var(--interactive-accent-rgb, 100, 130, 230), 0.1);
+  border-left: 3px solid var(--interactive-accent);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+  pointer-events: none;
+  z-index: 5;
+  box-sizing: border-box;
+  display: none;
+}
+
+/* ── Popup ────────────────────────────────────────────────────── */
+.dtl-popup {
+  position: fixed;
+  z-index: 9999;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 12px 12px 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 1px 4px rgba(0, 0, 0, 0.08);
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: dtl-popup-in 0.1s ease;
+}
+
+@keyframes dtl-popup-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.dtl-popup-input {
+  background: var(--background-modifier-form-field);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 5px;
+  color: var(--text-normal);
+  font-size: 12px;
+  padding: 5px 8px;
+  outline: none;
+  box-sizing: border-box;
+  width: 100%;
+  transition: border-color 0.1s;
+}
+
+.dtl-popup-input:focus {
+  border-color: var(--interactive-accent);
+}
+
+.dtl-popup-title {
+  font-weight: 500;
+}
+
+.dtl-popup-time-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.dtl-popup-time {
+  flex: 1;
+  text-align: center;
+  font-size: 11px;
+}
+
+.dtl-popup-time-sep {
+  color: var(--text-faint);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.dtl-popup-btn-row {
+  display: flex;
+  gap: 5px;
+}
+
+.dtl-popup-btn {
+  flex: 1;
+  border: 1px solid var(--background-modifier-border);
+  background: none;
+  color: var(--text-muted);
+  border-radius: 5px;
+  padding: 4px 6px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.dtl-popup-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.dtl-popup-btn--primary {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.dtl-popup-btn--primary:hover {
+  background: var(--interactive-accent-hover);
+  color: var(--text-on-accent);
+}
+
+.dtl-popup-btn--danger {
+  border-color: var(--color-red);
+  color: var(--color-red);
+}
+
+.dtl-popup-btn--danger:hover {
+  background: rgba(var(--color-red-rgb, 220, 53, 69), 0.08);
+}
