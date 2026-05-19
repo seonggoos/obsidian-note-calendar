@@ -1,0 +1,277 @@
+/* ── Root ───────────────────────────────────────────────────── */
+.dtl-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-family: var(--font-interface);
+  background: var(--background-primary);
+}
+
+/* ── Header ─────────────────────────────────────────────────── */
+.dtl-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.dtl-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.dtl-date {
+  flex: 1;
+  text-align: center;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-normal);
+}
+
+.dtl-nav-btn,
+.dtl-today-btn {
+  background: none;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 3px 9px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.dtl-nav-btn:hover,
+.dtl-today-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.dtl-mode-toggle {
+  display: flex;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.dtl-mode-btn {
+  background: none;
+  border: none;
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.dtl-mode-btn.active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.dtl-mode-btn:hover:not(.active) {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* ── Scroll wrapper ──────────────────────────────────────────── */
+.dtl-wrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 16px 40px 16px;
+}
+
+/* ── Daily grid ──────────────────────────────────────────────── */
+.dtl-grid {
+  position: relative;
+  margin-left: 44px;
+}
+
+.dtl-hour-row {
+  position: relative;
+  height: 72px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.dtl-hour-label {
+  position: absolute;
+  left: -40px;
+  top: -9px;
+  font-size: 10px;
+  color: var(--text-faint);
+  width: 34px;
+  text-align: right;
+  user-select: none;
+}
+
+/* ── Events overlay ──────────────────────────────────────────── */
+.dtl-events {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.dtl-event {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-radius: 5px;
+  padding: 4px 7px 12px;
+  font-size: 12px;
+  cursor: grab;
+  user-select: none;
+  pointer-events: all;
+  box-sizing: border-box;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,.15);
+  transition: box-shadow 0.1s;
+}
+
+.dtl-event:hover { box-shadow: 0 2px 8px rgba(0,0,0,.25); z-index: 10; }
+.dtl-event.dtl-dragging { opacity: .85; cursor: grabbing; z-index: 100; box-shadow: 0 4px 16px rgba(0,0,0,.3); }
+
+.dtl-event--compact {
+  padding: 3px 5px 4px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.dtl-event-time {
+  font-size: 10px;
+  opacity: .85;
+  margin-bottom: 1px;
+}
+
+.dtl-event-title {
+  font-weight: 500;
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.dtl-event-resize {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 10px;
+  cursor: ns-resize;
+  border-radius: 0 0 5px 5px;
+  background: rgba(255,255,255,.15);
+  opacity: 0;
+  transition: opacity .15s;
+}
+.dtl-event:hover .dtl-event-resize { opacity: 1; }
+
+/* ── Now line ────────────────────────────────────────────────── */
+.dtl-now-line {
+  position: absolute;
+  left: -4px; right: 0;
+  height: 2px;
+  background: var(--color-red);
+  pointer-events: none;
+  z-index: 50;
+}
+.dtl-now-line::before {
+  content: '';
+  position: absolute;
+  left: -3px; top: -4px;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--color-red);
+}
+
+/* ── Empty ───────────────────────────────────────────────────── */
+.dtl-empty {
+  padding: 32px 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+  white-space: pre-line;
+}
+
+/* ── Weekly layout ───────────────────────────────────────────── */
+.dtl-wrap--weekly {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dtl-week-grid {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.dtl-week-headers {
+  display: flex;
+  border-bottom: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
+}
+
+.dtl-week-gutter {
+  width: 44px;
+  flex-shrink: 0;
+}
+
+.dtl-week-day-header {
+  flex: 1;
+  text-align: center;
+  padding: 6px 4px;
+  border-left: 1px solid var(--background-modifier-border);
+  cursor: pointer;
+}
+.dtl-week-day-header:hover { background: var(--background-modifier-hover); }
+.dtl-week-day-header.today { background: var(--background-modifier-active-hover); }
+
+.dtl-week-day-name {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.dtl-week-day-date {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.dtl-week-day-header.today .dtl-week-day-date {
+  color: var(--interactive-accent);
+}
+
+.dtl-week-cols-wrap {
+  display: flex;
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 40px;
+}
+
+.dtl-week-hour-col {
+  width: 44px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.dtl-week-hour-col .dtl-hour-row {
+  border-right: 1px solid var(--background-modifier-border);
+}
+
+.dtl-week-col {
+  flex: 1;
+  border-left: 1px solid var(--background-modifier-border);
+  position: relative;
+  min-width: 80px;
+}
+
+.dtl-week-col.today { background: rgba(var(--interactive-accent-rgb), 0.03); }
+
+.dtl-week-col .dtl-events { pointer-events: all; }
+
+.dtl-week-col .dtl-now-line { left: 0; }
