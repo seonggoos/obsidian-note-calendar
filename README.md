@@ -21,6 +21,12 @@ A visual interactive calendar for [Obsidian](https://obsidian.md) — turn your 
 - **Now line** — red indicator showing the current time
 - **Configurable** — section name, note folder, and default event duration are all customizable
 
+## Screenshots
+
+| Daily | Weekly | Monthly |
+|-------|--------|---------|
+| ![Daily view](assets/daily.png) | ![Weekly view](assets/weekly.png) | ![Monthly view](assets/monthly.png) |
+
 ## How It Works
 
 Schedule Calendar reads schedule entries from your daily notes and renders them as interactive blocks on a timeline. Any changes made in the calendar are written back to the note file automatically — no separate database.
